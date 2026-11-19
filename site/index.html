@@ -98,6 +98,14 @@
     .sheet { border: 0; border-radius: 20px; padding: 18px 20px 16px; width: min(860px, calc(100vw - 32px));
       background: var(--card); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
     .sheet::backdrop { background: rgba(0,0,0,.45); }
+    .settings { width: min(460px, calc(100vw - 32px)); }
+    .settings label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); margin: 10px 0; }
+    .settings input { font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--axis);
+      background: var(--page); color: var(--ink); min-height: 42px; width: 100%; }
+    .set-hint { font-size: 13px; color: var(--ink-2); margin: 4px 0; }
+    .set-actions { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
+    .btn.ghost { background: var(--soft); color: var(--ink); }
+    .btn.danger { color: var(--down); }
     .sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
     .sheet h2 { font-size: 20px; margin: 0; }
     .sheet-now { margin: 2px 0 0; font-size: 15px; color: var(--ink-2); }
@@ -128,6 +136,10 @@
       .info h2 { font-size: 25px; }
       .num { width: 32px; height: 32px; font-size: 18px; }
       .v { font-size: 26px; }
+      header { align-items: flex-start; }
+      header h1 { font-size: 16px; }
+      .head-actions { gap: 6px; }
+      #refresh { padding: 0 12px; }
     }
 
     /* 電腦版（寬 ≥ 760px）：左圖右說明 */
@@ -174,6 +186,7 @@
       </div>
       <div class="head-actions">
         <button class="btn icon" id="theme" type="button" aria-label="切換深色／淺色模式" title="切換深色／淺色模式"></button>
+        <button class="btn icon" id="settings-btn" type="button" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         <button class="btn" id="refresh">↻ 更新</button>
       </div>
     </header>
@@ -229,13 +242,35 @@
     <p class="sheet-note" id="sheet-note"></p>
   </dialog>
 
+  <dialog class="sheet settings" id="settings" aria-labelledby="set-title">
+    <form method="dialog">
+      <div class="sheet-head">
+        <h2 id="set-title">設定</h2>
+        <button class="close" value="cancel" type="submit" aria-label="關閉">✕</button>
+      </div>
+      <p class="set-hint">網站每小時會自動更新，一般瀏覽<b>不需要</b>設定。只有網站擁有者想讓「↻ 更新」立刻重新抓資料時，才需要貼上 GitHub token。token 只存在這個瀏覽器。</p>
+      <label>GitHub token
+        <input id="set-token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…" />
+      </label>
+      <p class="set-hint" id="token-state"></p>
+      <label>GitHub repo
+        <input id="set-repo" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="set-actions">
+        <button class="btn ghost danger" id="clear-token" type="button">清除 token</button>
+        <span style="flex:1"></span>
+        <button class="btn" value="save" type="submit">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
   <div class="toast" id="toast" hidden></div>
 
   <script type="module">
     import { REGIMES } from './js/regimes.js';
     import { classify, regimeKey } from './js/regime.js';
     import { fmt, signed, localDateTime, relTime, esc } from './js/format.js';
-    import { manualRefresh } from './js/refresh.js';
+    import { manualRefresh, getSettings, saveSettings, clearToken, isLocal } from './js/refresh.js';
 
     const LOOKBACK = 20;
     const TRAIL = 63; // 約 3 個月
@@ -315,7 +350,7 @@
       const cx = W / 2, cy = H / 2, pad = 30, small = W < 420;
       const mx = niceMax(Math.max(0.5, ...anim.pts.map((p) => Math.abs(p.x))) * 1.15);
       const my = niceMax(Math.max(5, ...anim.pts.map((p) => Math.abs(p.y))) * 1.15);
-      geo = { X: (v) => cx + (v / mx) * (cx - pad), Y: (v) => cy - (v / my) * (cy - pad) };
+      geo = { X: (v) => cx + (v / mx) * (cx - pad), Y: (v) => cy - (v / my) * (cy - pad), midY: cy };
 
       const cells = [['down-up', 0, 0], ['up-up', cx, 0], ['down-down', 0, cy], ['up-down', cx, cy]];
       let s = '';
@@ -357,10 +392,13 @@
       s += `<text x="${X(p[0].x)}" y="${Y(p[0].y) + 18}" text-anchor="middle" font-size="12" fill="var(--muted)" stroke="var(--card)" stroke-width="3" paint-order="stroke">3 個月前</text>`;
       const nx = X(cx), ny = Y(cy);
       const label = done ? '現在' : p[Math.round(anim.f)].date.slice(5).replace('-', '/');
+      // 標籤預設在點上方；若會壓到中線上的「美元走強／走弱」文字，就改放到點下方
+      const above = ny - 26;
+      const ly = Math.abs(above - (geo.midY - 8)) < 18 ? ny + 34 : above;
       s += `<g data-regime="${at}" pointer-events="none">
         <circle cx="${nx}" cy="${ny}" r="22" fill="var(--rc)" fill-opacity=".2"/>
         <circle cx="${nx}" cy="${ny}" r="12" fill="var(--rc)" stroke="var(--card)" stroke-width="3"/>
-        <text x="${nx}" y="${ny - 26}" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)" stroke="var(--card)" stroke-width="4" paint-order="stroke">${label}</text>
+        <text x="${nx}" y="${ly}" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)" stroke="var(--card)" stroke-width="4" paint-order="stroke">${label}</text>
       </g>`;
       $('q-dyn').innerHTML = s;
       $('q-dyn').setAttribute('pointer-events', 'none');
@@ -511,12 +549,36 @@
     darkMQ.addEventListener('change', paintThemeBtn);
     paintThemeBtn();
 
+    // ---------- 設定（token） ----------
+    $('settings-btn').onclick = () => {
+      const s = getSettings();
+      $('set-repo').value = s.repo;
+      $('set-token').value = '';
+      $('token-state').textContent = isLocal()
+        ? '目前是本機模式，「↻ 更新」不需要 token。'
+        : s.token ? '✓ 已設定 token（留空表示不變更）' : '尚未設定 token';
+      $('settings').showModal();
+    };
+    $('clear-token').onclick = () => {
+      clearToken();
+      $('token-state').textContent = '已清除 token';
+      toast('已清除 token');
+    };
+    $('settings').addEventListener('close', () => {
+      if ($('settings').returnValue !== 'save') return;
+      const token = $('set-token').value.trim();
+      saveSettings({ repo: $('set-repo').value, branch: getSettings().branch, token: token || undefined });
+      toast(token ? '已儲存 token，「↻ 更新」會立即重新抓取資料' : '設定已儲存');
+    });
+    $('settings').addEventListener('click', (e) => { if (e.target === $('settings')) $('settings').close(); });
+
     const btn = $('refresh');
     btn.onclick = async () => {
       btn.disabled = true;
       try {
         const r = await manualRefresh({ onStage: (s) => (btn.textContent = s), reloadData: load });
-        toast(r.message);
+        // 沒有 token 的訪客：不提 token，只告訴他資料已是最新發布版本
+        toast(r.mode === 'reload-only' ? `已載入最新資料（${now.date}）。網站每小時會自動更新。` : r.message);
       } catch (e) { toast(e.message); }
       finally { btn.disabled = false; btn.textContent = '↻ 更新'; }
     };

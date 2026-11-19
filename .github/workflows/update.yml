@@ -1,0 +1,56 @@
+name: Update data & deploy
+
+on:
+  schedule:
+    - cron: '17 * * * *' # 每小時第 17 分（UTC），避開整點壅塞
+  workflow_dispatch: # 網頁「立即更新」按鈕或 Actions 頁面手動觸發
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Test
+        run: npm test
+
+      - name: Fetch data
+        env:
+          # 上一版已發布的資料：某個來源失敗時沿用
+          PREV_DATA_URL: ${{ steps.pages.outputs.base_url }}/data/data.json
+        run: npm run fetch
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

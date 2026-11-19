@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>美元 × 利差 四象限</title>
+  <meta name="description" content="追蹤美元指數（DXY）與美債利差（10Y−2Y），判讀目前的流動性環境。" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%2319a874'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%23eda100'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%232a78d6'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e34948'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <h1>美元 × 利差 四象限</h1>
+        <p class="sub">DXY 與 10Y−2Y 美債利差的方向組合，決定流動性環境</p>
+      </div>
+      <div class="controls">
+        <div class="seg" role="radiogroup" aria-label="回看期間" id="lookback"></div>
+        <button class="btn primary" id="refresh-btn" type="button">
+          <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-label">立即更新</span>
+        </button>
+        <button class="btn icon-only" id="settings-btn" type="button" aria-label="設定" title="設定">⚙</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" id="main" aria-busy="true">
+    <p class="status-line" id="status-line">載入資料中…</p>
+    <div id="alerts" class="alerts" role="status" aria-live="polite"></div>
+
+    <section class="now" id="now" aria-labelledby="now-title">
+      <div class="now-card" id="now-card">
+        <p class="eyebrow" id="now-eyebrow">目前組合</p>
+        <h2 id="now-title"><span class="badge" id="now-badge">–</span><span id="now-name">–</span></h2>
+        <p class="now-meta" id="now-meta"></p>
+        <dl class="now-detail">
+          <div><dt>驅動主因</dt><dd id="now-driver">–</dd></div>
+          <div><dt>流動性與資產表現</dt><dd id="now-assets">–</dd></div>
+        </dl>
+      </div>
+      <div class="matrix-wrap">
+        <div class="matrix" id="matrix" aria-label="四象限矩陣"></div>
+        <div class="axis-x"><span>← 美元走弱</span><span>美元走強 →</span></div>
+      </div>
+    </section>
+
+    <section class="cards" id="cards" aria-label="四個指標"></section>
+
+    <section class="panel" aria-labelledby="chart-title">
+      <div class="panel-head">
+        <h2 id="chart-title">歷史走勢</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div id="chart" class="chart" role="img" aria-label="DXY、10Y−2Y 利差、2Y 與 10Y 殖利率以及每日組合的時間序列圖"></div>
+    </section>
+
+    <section class="panel">
+      <details id="table-details">
+        <summary><h2>資料表（最近 30 個交易日）</h2></summary>
+        <div class="table-scroll"><table class="data-table" id="data-table"></table></div>
+      </details>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p>
+      框架出處：LEI（The Market Memo）〈<a href="https://youtu.be/Y8V3LJn4uhE" target="_blank" rel="noopener">決定未來風險資產走向的，其實就這「兩個數字」</a>〉。
+      判讀為機械式規則：回看期間內 DXY 變化 &gt; 0 為走強、利差變化 &gt; 0 為走陡；|ΔDXY| &lt; 0.5% 或 |Δ利差| &lt; 0.05 個百分點標示為訊號偏弱。
+    </p>
+    <p>
+      資料來源：DXY — Yahoo Finance（DX-Y.NYB，ICE 美元指數）；2Y / 10Y — 美國財政部 Daily Treasury Par Yield Curve（備援：FRED DGS2 / DGS10）。利差 = 10Y − 2Y。
+    </p>
+    <p class="disclaimer">本網站內容非投資建議，僅供學習與參考。投資有風險，決策請自行判斷。</p>
+  </footer>
+
+  <dialog id="settings" class="dialog">
+    <form method="dialog" id="settings-form">
+      <h2>設定</h2>
+      <div id="settings-github">
+        <p class="hint">
+          「立即更新」會觸發 GitHub Actions 重新抓資料並部署，需要一個只授權此 repo 的
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>，
+          權限選 <b>Actions：Read and write</b>。token 只存在這台裝置的瀏覽器，只會送到 api.github.com。
+        </p>
+        <label>GitHub repo（owner/name）
+          <input id="set-repo" name="repo" autocomplete="off" spellcheck="false" placeholder="your-name/usd-dashboard" />
+        </label>
+        <label>分支
+          <input id="set-branch" name="branch" autocomplete="off" spellcheck="false" placeholder="main" />
+        </label>
+        <label>GitHub token
+          <input id="set-token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…" />
+        </label>
+        <p class="hint" id="token-state"></p>
+      </div>
+      <p class="hint" id="settings-local" hidden>本機模式：「立即更新」會直接讓本機伺服器重新抓取資料，不需要 token。</p>
+      <div class="dialog-actions">
+        <button class="btn danger" id="clear-token" type="button">清除 token</button>
+        <span class="spacer"></span>
+        <button class="btn" value="cancel" type="submit" formnovalidate>取消</button>
+        <button class="btn primary" id="save-settings" value="save" type="submit">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

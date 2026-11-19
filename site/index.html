@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>美元 × 利差</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f6f5f1; --card: #ffffff; --soft: #f1f0eb; --ink: #111; --ink-2: #55534e; --muted: #8a8882;
+      --line: #e4e2da; --axis: #c3c2b7;
+      --r1: #e34948; --r2: #eda100; --r3: #1baf7a; --r4: #2a78d6;
+      --up: #067a3a; --down: #c62828; /* 上漲綠、下跌紅 */
+      --font: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --page: #0e0e0d; --card: #1a1a19; --soft: #242422; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #8a8882;
+        --line: #2c2c2a; --axis: #45443f;
+        --r2: #c98500; --r3: #199e70; --r4: #3987e5;
+        --up: #3fbf6b; --down: #f06a6a;
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #0e0e0d; --card: #1a1a19; --soft: #242422; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #8a8882;
+      --line: #2c2c2a; --axis: #45443f;
+      --r2: #c98500; --r3: #199e70; --r4: #3987e5;
+      --up: #3fbf6b; --down: #f06a6a;
+    }
+    [data-regime="up-down"] { --rc: var(--r1); --rink: #fff; }
+    [data-regime="up-up"] { --rc: var(--r2); --rink: #111; }
+    [data-regime="down-up"] { --rc: var(--r3); --rink: #fff; }
+    [data-regime="down-down"] { --rc: var(--r4); --rink: #fff; }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--font); line-height: 1.5; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 14px 16px 28px; display: grid; gap: 12px; }
+    .card { background: var(--card); border-radius: 18px; padding: 16px 18px; min-width: 0; }
+
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    header h1 { font-size: 17px; margin: 0; }
+    .upd { font-size: 12px; color: var(--muted); }
+    .btn { font: inherit; font-size: 14px; border: 0; border-radius: 999px; padding: 7px 16px; min-height: 36px;
+      background: var(--ink); color: var(--page); cursor: pointer; white-space: nowrap; }
+    .btn[disabled] { opacity: .6; cursor: progress; }
+
+    /* 四象限圖 */
+    .map { padding: 10px; position: relative; }
+    .map-box { position: relative; aspect-ratio: 1; }
+    .map svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    svg text { font-family: var(--font); }
+    .q-cell { cursor: pointer; }
+    .map-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 4px 0; }
+    .replay { font: inherit; font-size: 12px; border: 0; border-radius: 999px;
+      padding: 4px 10px; background: var(--card); color: var(--ink-2); cursor: pointer; box-shadow: 0 0 0 1px var(--line); }
+    .hint { font-size: 12px; color: var(--muted); margin: 0; }
+
+    /* 說明 */
+    .info { border-top: 8px solid var(--rc); display: flex; flex-direction: column; gap: 10px; }
+    .info .tagline { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--ink-2); }
+    .pill { font-size: 12px; font-weight: 700; padding: 1px 10px; border-radius: 999px; background: var(--ink); color: var(--page); }
+    .back { font: inherit; font-size: 13px; border: 0; background: none; color: var(--ink-2); text-decoration: underline; cursor: pointer; padding: 0; }
+    .info h2 { font-size: 30px; margin: 0; display: flex; align-items: center; gap: 12px; line-height: 1.2; }
+    .num { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 11px;
+      background: var(--rc); color: var(--rink); font-size: 21px; font-weight: 800; flex: none; }
+    .combo { font-size: 15px; font-weight: 700; margin: 0; }
+    .plain { font-size: 16px; margin: 0; color: var(--ink-2); }
+    .assets { display: grid; gap: 6px; }
+    .assets div { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .assets b { font-size: 13px; width: 5.5em; flex: none; color: var(--ink-2); }
+    .tag { font-size: 14px; padding: 1px 10px; border-radius: 999px; background: var(--soft); }
+
+    /* 兩個數字 */
+    .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+    .num-btn { font: inherit; color: inherit; text-align: left; background: var(--soft); border: 1px solid transparent;
+      border-radius: 14px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .num-btn:hover { border-color: var(--axis); }
+    .num-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .k { font-size: 13px; color: var(--ink-2); margin: 0; display: flex; justify-content: space-between; gap: 6px; }
+    .more { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+    .v { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0; line-height: 1.15; }
+    .v small { font-size: 15px; font-weight: 500; color: var(--ink-2); }
+    .dir { font-size: 14px; font-weight: 700; margin: 2px 0 0; }
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+
+    /* 單一指標走勢（彈出視窗） */
+    .sheet { border: 0; border-radius: 20px; padding: 18px 20px 16px; width: min(860px, calc(100vw - 32px));
+      background: var(--card); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .sheet::backdrop { background: rgba(0,0,0,.45); }
+    .sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+    .sheet h2 { font-size: 20px; margin: 0; }
+    .sheet-now { margin: 2px 0 0; font-size: 15px; color: var(--ink-2); }
+    .sheet-now b { font-size: 22px; color: var(--ink); margin-right: 8px; }
+    .close { font: inherit; font-size: 18px; width: 40px; height: 40px; border-radius: 999px; border: 0; background: var(--soft); color: var(--ink); cursor: pointer; flex: none; }
+    .seg { display: inline-flex; background: var(--soft); border-radius: 999px; padding: 3px; margin-bottom: 8px; }
+    .seg button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--ink-2); padding: 5px 14px; border-radius: 999px; cursor: pointer; min-height: 32px; }
+    .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 0 0 1px var(--line); }
+    .sheet-chart { position: relative; height: min(52vh, 380px); }
+    .sheet-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
+    .sheet-note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+    .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--page); font-size: 12px;
+      padding: 3px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -120%); z-index: 2; }
+    .tip[hidden] { display: none; }
+    @media (max-width: 520px) {
+      .sheet { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 20px 20px 0 0; padding: 16px 14px 20px; }
+      .sheet-chart { height: 46vh; }
+    }
+    .note { font-size: 12px; color: var(--muted); margin: 0; }
+
+    footer { font-size: 12px; color: var(--muted); text-align: center; }
+    footer a { color: inherit; }
+    .toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--ink); color: var(--page);
+      padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
+    .toast[hidden] { display: none; }
+
+    @media (max-width: 520px) {
+      .info h2 { font-size: 25px; }
+      .num { width: 32px; height: 32px; font-size: 18px; }
+      .v { font-size: 26px; }
+    }
+
+    /* 電腦版：左圖右說明，一頁呈現 */
+    @media (min-width: 960px) and (min-height: 560px) {
+      html, body { height: 100%; overflow: hidden; }
+      .wrap { max-width: 1280px; height: 100vh; padding: 16px 24px 12px;
+        grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-areas: "head head" "map info" "foot foot"; gap: 16px; }
+      header { grid-area: head; }
+      .map { grid-area: map; display: flex; flex-direction: column; min-height: 0; }
+      .map-box { flex: 1; aspect-ratio: auto; min-height: 0; }
+      .info { grid-area: info; overflow: auto; justify-content: center; padding: 24px 28px; gap: 14px; }
+      footer { grid-area: foot; }
+      .info h2 { font-size: clamp(28px, 4vh, 40px); }
+      .num { width: 44px; height: 44px; font-size: 24px; }
+      .plain { font-size: 17px; }
+      .v { font-size: clamp(28px, 4.4vh, 40px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>美元 × 利差　現在在哪一格？</h1>
+        <div class="upd" id="upd">載入中…</div>
+      </div>
+      <button class="btn" id="refresh">↻ 更新</button>
+    </header>
+
+    <section class="card map">
+      <div class="map-box"><svg id="quad" role="img" aria-label="四象限圖"><g id="q-static"></g><g id="q-dyn"></g></svg></div>
+      <div class="map-foot">
+        <p class="hint">點任一格看該情境的說明</p>
+        <button class="replay" id="replay" type="button">↺ 重播軌跡</button>
+      </div>
+    </section>
+
+    <section class="card info" id="info">
+      <div class="tagline"><span id="tag-left"></span><span id="tag-right"></span></div>
+      <h2><span class="num" id="i-num">–</span><span id="i-name">–</span></h2>
+      <p class="combo" id="i-combo"></p>
+      <p class="plain" id="i-plain"></p>
+      <div class="assets">
+        <div><b>✓ 相對有利</b><span id="i-good"></span></div>
+        <div><b>✗ 容易受傷</b><span id="i-bad"></span></div>
+      </div>
+      <div class="nums">
+        <button class="num-btn" type="button" data-ind="dxy" aria-haspopup="dialog">
+          <span class="k">美元指數 DXY <span class="more">走勢 ›</span></span>
+          <span class="v" id="dxy-v">–</span>
+          <span class="dir" id="dxy-dir"></span>
+        </button>
+        <button class="num-btn" type="button" data-ind="spread" aria-haspopup="dialog">
+          <span class="k">美債利差 10Y − 2Y <span class="more">走勢 ›</span></span>
+          <span class="v" id="sp-v">–</span>
+          <span class="dir" id="sp-dir"></span>
+        </button>
+      </div>
+      <p class="note">與 20 個交易日前比較。美元上漲＝走強，利差擴大＝走陡。</p>
+    </section>
+
+    <footer>框架：<a href="https://youtu.be/Y8V3LJn4uhE" target="_blank" rel="noopener">LEI〈決定未來風險資產走向的，其實就這「兩個數字」〉</a> · 資料：Yahoo Finance、美國財政部 · 非投資建議 · <a href="full.html">完整版</a></footer>
+  </div>
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+    <div class="sheet-head">
+      <div>
+        <h2 id="sheet-title">–</h2>
+        <p class="sheet-now" id="sheet-now"></p>
+      </div>
+      <button class="close" id="sheet-close" type="button" aria-label="關閉">✕</button>
+    </div>
+    <div class="seg" id="sheet-range" role="group" aria-label="期間">
+      <button type="button" data-days="63">3 個月</button>
+      <button type="button" data-days="252" aria-pressed="true">1 年</button>
+      <button type="button" data-days="1260">5 年</button>
+    </div>
+    <div class="sheet-chart"><svg id="sheet-svg"></svg><div class="tip" hidden></div></div>
+    <p class="sheet-note" id="sheet-note"></p>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module">
+    import { REGIMES } from './js/regimes.js';
+    import { classify, regimeKey } from './js/regime.js';
+    import { fmt, signed, localDateTime, relTime, esc } from './js/format.js';
+    import { manualRefresh } from './js/refresh.js';
+
+    const LOOKBACK = 20;
+    const TRAIL = 63; // 約 3 個月
+    const ANIM_MS = 5000;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const $ = (id) => document.getElementById(id);
+
+    let data = null, results = [], now = null, selected = null, geo = null;
+    const anim = { pts: [], f: 0, raf: 0, played: false };
+
+    async function load() {
+      const res = await fetch(`data/data.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      if (!data || d.generatedAt !== data.generatedAt) { data = d; render(); }
+      $('upd').textContent = `資料 ${now.date} · 更新於 ${localDateTime(data.generatedAt)}（${relTime(data.generatedAt)}）`;
+      return data.generatedAt;
+    }
+
+    function render() {
+      results = classify(data.rows, LOOKBACK).filter((r) => r.regime);
+      now = results[results.length - 1];
+      // 軌跡用每週一點（每 5 個交易日），比每日乾淨；最後一點一定是今天
+      const recent = results.slice(-TRAIL);
+      const weekly = recent.filter((_, i) => (recent.length - 1 - i) % 5 === 0);
+      anim.pts = weekly.map((r) => ({ date: r.date, x: r.dDxyPct, y: r.dSpread * 100 }));
+      anim.f = anim.pts.length - 1;
+
+      $('dxy-v').textContent = fmt(now.dxy, 2);
+      $('dxy-dir').textContent = `${now.dDxy > 0 ? '▲ 走強' : '▼ 走弱'} ${signed(now.dDxyPct, 1)}%`;
+      $('dxy-dir').className = `dir ${now.dDxy > 0 ? 'up' : 'down'}`;
+      $('sp-v').innerHTML = `${fmt(now.spread, 2)}<small> %</small>`;
+      const bpv = Math.round(now.dSpread * 100);
+      $('sp-dir').textContent = `${now.dSpread > 0 ? '▲ 擴大' : '▼ 縮小'} ${bpv > 0 ? '+' : '−'}${Math.abs(bpv)} bp`;
+      $('sp-dir').className = `dir ${now.dSpread > 0 ? 'up' : 'down'}`;
+
+      showRegime(selected ?? now.regime);
+      drawStatic();
+      if (!anim.played && !reduceMotion) { anim.played = true; play(); } else drawDyn();
+    }
+
+    // ---------- 說明卡 ----------
+    function showRegime(key) {
+      selected = key === now.regime ? null : key;
+      const R = REGIMES[key];
+      $('info').dataset.regime = key;
+      if (key === now.regime) {
+        $('tag-left').innerHTML = `<span class="pill">現在</span>`;
+        $('tag-right').textContent = now.weak ? '變化不大，訊號偏弱' : '';
+      } else {
+        $('tag-left').textContent = `查看其他情境（現在是 ${REGIMES[now.regime].num}）`;
+        $('tag-right').innerHTML = `<button class="back" id="back" type="button">回到現在</button>`;
+        $('back').onclick = () => { showRegime(now.regime); drawDyn(); };
+      }
+      $('i-num').textContent = R.num;
+      $('i-name').textContent = R.name;
+      $('i-combo').textContent = `${R.dollar} ＋ ${R.curve === '曲線走陡' ? '利差擴大' : '利差縮小'}`;
+      $('i-plain').textContent = R.plain;
+      $('i-good').innerHTML = R.good.map((x) => `<span class="tag">${esc(x)}</span>`).join(' ');
+      $('i-bad').innerHTML = R.bad.map((x) => `<span class="tag">${esc(x)}</span>`).join(' ');
+    }
+
+    $('q-static').addEventListener('click', (e) => {
+      const g = e.target.closest('.q-cell');
+      if (g) { showRegime(g.dataset.regime); drawDyn(); }
+    });
+
+    // ---------- 四象限圖 ----------
+    function niceMax(v) {
+      return [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200].find((s) => s >= v) ?? v;
+    }
+
+    function drawStatic() {
+      const svg = $('quad');
+      const W = Math.max(200, Math.round(svg.clientWidth)), H = Math.max(200, Math.round(svg.clientHeight));
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const cx = W / 2, cy = H / 2, pad = 30, small = W < 420;
+      const mx = niceMax(Math.max(0.5, ...anim.pts.map((p) => Math.abs(p.x))) * 1.15);
+      const my = niceMax(Math.max(5, ...anim.pts.map((p) => Math.abs(p.y))) * 1.15);
+      geo = { X: (v) => cx + (v / mx) * (cx - pad), Y: (v) => cy - (v / my) * (cy - pad) };
+
+      const cells = [['down-up', 0, 0], ['up-up', cx, 0], ['down-down', 0, cy], ['up-down', cx, cy]];
+      let s = '';
+      for (const [k, x, y] of cells) {
+        const R = REGIMES[k];
+        const left = x === 0, top = y === 0;
+        const tx = left ? 14 : W - 14;
+        const ty = top ? 30 : H - 16;
+        s += `<g class="q-cell" data-regime="${k}">
+          <rect x="${x}" y="${y}" width="${cx}" height="${cy}" fill="var(--rc)" fill-opacity=".08" rx="0"/>
+          <text x="${tx}" y="${ty}" text-anchor="${left ? 'start' : 'end'}" font-size="${small ? 15 : 19}" font-weight="800" fill="var(--ink)">${R.num} ${R.name}</text>
+        </g>`;
+      }
+      s += `<line x1="0" x2="${W}" y1="${cy}" y2="${cy}" stroke="var(--axis)" stroke-width="1.5"/><line y1="0" y2="${H}" x1="${cx}" x2="${cx}" stroke="var(--axis)" stroke-width="1.5"/>`;
+      const lab = (x, y, t, a) => `<text x="${x}" y="${y}" text-anchor="${a}" font-size="13" font-weight="600" fill="var(--ink-2)" stroke="var(--card)" stroke-width="3" paint-order="stroke">${t}</text>`;
+      s += lab(W - 10, cy - 8, '美元走強 →', 'end') + lab(10, cy - 8, '← 美元走弱', 'start');
+      s += lab(cx + 8, small ? 52 : 58, '↑ 利差擴大', 'start') + lab(cx + 8, H - (small ? 40 : 46), '↓ 利差縮小', 'start');
+      $('q-static').innerHTML = s;
+    }
+
+    function drawDyn() {
+      if (!geo || !anim.pts.length) return;
+      const { X, Y } = geo, p = anim.pts;
+      const k = Math.max(0, Math.min(p.length - 1, Math.floor(anim.f))), t = Math.max(0, anim.f - k);
+      const b = p[Math.min(p.length - 1, k + 1)];
+      const cx = p[k].x + (b.x - p[k].x) * t, cy = p[k].y + (b.y - p[k].y) * t;
+      const at = regimeKey(cx, cy);
+      const done = anim.f >= p.length - 1;
+      let s = '';
+      for (let i = 0; i < k; i++) {
+        const op = 0.06 + 0.45 * ((i + 1) / Math.max(1, k));
+        s += `<line x1="${X(p[i].x).toFixed(1)}" y1="${Y(p[i].y).toFixed(1)}" x2="${X(p[i + 1].x).toFixed(1)}" y2="${Y(p[i + 1].y).toFixed(1)}" stroke="var(--ink)" stroke-opacity="${op.toFixed(2)}" stroke-width="2.5" stroke-linecap="round"/>`;
+      }
+      if (t > 0) s += `<line x1="${X(p[k].x)}" y1="${Y(p[k].y)}" x2="${X(cx)}" y2="${Y(cy)}" stroke="var(--ink)" stroke-opacity=".5" stroke-width="2.5" stroke-linecap="round"/>`;
+      for (let i = 0; i <= k; i++) {
+        const op = 0.15 + 0.45 * ((i + 1) / Math.max(1, k + 1));
+        s += `<circle cx="${X(p[i].x).toFixed(1)}" cy="${Y(p[i].y).toFixed(1)}" r="3.5" fill="var(--ink)" fill-opacity="${op.toFixed(2)}"/>`;
+      }
+      s += `<text x="${X(p[0].x)}" y="${Y(p[0].y) + 18}" text-anchor="middle" font-size="12" fill="var(--muted)" stroke="var(--card)" stroke-width="3" paint-order="stroke">3 個月前</text>`;
+      const nx = X(cx), ny = Y(cy);
+      const label = done ? '現在' : p[Math.round(anim.f)].date.slice(5).replace('-', '/');
+      s += `<g data-regime="${at}" pointer-events="none">
+        <circle cx="${nx}" cy="${ny}" r="22" fill="var(--rc)" fill-opacity=".2"/>
+        <circle cx="${nx}" cy="${ny}" r="12" fill="var(--rc)" stroke="var(--card)" stroke-width="3"/>
+        <text x="${nx}" y="${ny - 26}" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)" stroke="var(--card)" stroke-width="4" paint-order="stroke">${label}</text>
+      </g>`;
+      $('q-dyn').innerHTML = s;
+      $('q-dyn').setAttribute('pointer-events', 'none');
+
+      // 加亮：點所在的格子；若正在查看其他格，也加框標示
+      const view = selected ?? now.regime;
+      for (const g of $('q-static').querySelectorAll('.q-cell')) {
+        const r = g.querySelector('rect');
+        r.setAttribute('fill-opacity', g.dataset.regime === at ? '.26' : '.08');
+        if (g.dataset.regime === view && selected) { r.setAttribute('stroke', 'var(--rc)'); r.setAttribute('stroke-width', '4'); }
+        else r.removeAttribute('stroke');
+      }
+    }
+
+    function play() {
+      cancelAnimationFrame(anim.raf);
+      const n = anim.pts.length;
+      anim.f = 0;
+      let last = performance.now();
+      const step = (t) => {
+        // 第一個 rAF 的時間戳可能早於 performance.now()，所以夾在 0 以上
+        anim.f = Math.max(0, Math.min(n - 1, anim.f + (Math.max(0, t - last) * (n - 1)) / ANIM_MS));
+        last = t;
+        drawDyn();
+        if (anim.f < n - 1) anim.raf = requestAnimationFrame(step);
+      };
+      anim.raf = requestAnimationFrame(step);
+    }
+    $('replay').onclick = play;
+
+    // ---------- 單一指標走勢（點數字開啟） ----------
+    const IND = {
+      dxy: { title: '美元指數 DXY', col: 1, unit: '', digits: 2,
+        note: () => 'ICE 美元指數：美元對歐元、日圓、英鎊等六種主要貨幣的強弱。灰底是判讀用的 20 個交易日比較區間。' },
+      spread: { title: '美債利差 10Y − 2Y', col: 4, unit: '%', digits: 2, zero: true,
+        note: () => `目前 10Y ${fmt(now.y10, 2)}% − 2Y ${fmt(now.y2, 2)}%。低於 0 代表殖利率曲線倒掛。灰底是判讀用的 20 個交易日比較區間。` },
+    };
+    const sheet = { ind: 'dxy', days: 252 };
+
+    document.querySelector('.nums').addEventListener('click', (e) => {
+      const b = e.target.closest('.num-btn');
+      if (!b) return;
+      sheet.ind = b.dataset.ind;
+      $('sheet').showModal();
+      drawSheet();
+    });
+    $('sheet-close').onclick = () => $('sheet').close();
+    $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) $('sheet').close(); });
+    $('sheet-range').onclick = (e) => {
+      const b = e.target.closest('button[data-days]');
+      if (!b) return;
+      sheet.days = Number(b.dataset.days);
+      drawSheet();
+    };
+
+    function drawSheet() {
+      const def = IND[sheet.ind];
+      $('sheet-title').textContent = def.title;
+      const v = sheet.ind === 'dxy' ? now.dxy : now.spread;
+      const dirEl = sheet.ind === 'dxy' ? $('dxy-dir') : $('sp-dir');
+      $('sheet-now').innerHTML = `<b>${fmt(v, def.digits)}${def.unit}</b><span class="${dirEl.className}" style="font-size:15px">${esc(dirEl.textContent)}</span>（${esc(now.date)}）`;
+      $('sheet-note').textContent = def.note();
+      $('sheet-range').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.days) === sheet.days)));
+      const pts = data.rows.filter((r) => r[1] != null && r[4] != null && r[0] <= now.date).slice(-sheet.days).map((r) => [r[0], r[def.col]]);
+      requestAnimationFrame(() => bigChart($('sheet-svg'), pts, def));
+    }
+
+    function niceTicks(lo, hi, count = 4) {
+      const raw = (hi - lo) / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+      const out = [];
+      for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 1e6) / 1e6);
+      return out;
+    }
+
+    function bigChart(svg, pts, { digits = 2, unit = '', zero = false }) {
+      const W = Math.max(240, Math.round(svg.clientWidth)), H = Math.max(160, Math.round(svg.clientHeight));
+      const l = 44, r = 56, t = 14, b = 26;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const vals = pts.map((p) => p[1]);
+      let lo = Math.min(...vals), hi = Math.max(...vals);
+      if (zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+      const span = hi - lo || 1; lo -= span * 0.06; hi += span * 0.06;
+      const n = pts.length - 1;
+      const X = (i) => l + (i / n) * (W - l - r);
+      const Y = (v) => t + (1 - (v - lo) / (hi - lo)) * (H - t - b);
+      let s = '';
+      // 格線與 Y 軸刻度
+      for (const v of niceTicks(lo, hi)) {
+        s += `<line x1="${l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/>`;
+        s += `<text x="${l - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmt(v, v % 1 ? (Math.abs(hi - lo) < 2 ? 2 : 1) : 0)}</text>`;
+      }
+      if (zero && lo < 0) {
+        s += `<line x1="${l}" x2="${W - r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--ink-2)" stroke-width="1.5"/>`;
+        s += `<text x="${l + 4}" y="${Y(0) + 14}" font-size="11" fill="var(--ink-2)">倒掛線</text>`;
+      }
+      // 20 日比較區間
+      const i0 = Math.max(0, n - LOOKBACK);
+      s += `<rect x="${X(i0)}" y="${t}" width="${X(n) - X(i0)}" height="${H - t - b}" fill="var(--ink)" fill-opacity=".06"/>`;
+      // X 軸日期
+      const xt = [0, Math.round(n / 2), n];
+      xt.forEach((i, j) => {
+        s += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? 'start' : j === 2 ? 'end' : 'middle'}" font-size="11" fill="var(--muted)">${pts[i][0]}</text>`;
+      });
+      // 線
+      const d = vals.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+      s += `<path d="${d}" fill="none" stroke="var(--r4)" stroke-width="2" stroke-linejoin="round"/>`;
+      s += `<circle cx="${X(n)}" cy="${Y(vals[n])}" r="5" fill="var(--r4)" stroke="var(--card)" stroke-width="2"/>`;
+      s += `<text x="${X(n) + 8}" y="${Y(vals[n]) + 4}" font-size="13" font-weight="700" fill="var(--ink)">${fmt(vals[n], digits)}</text>`;
+      s += `<line class="hl" y1="${t}" y2="${H - b}" stroke="var(--muted)" visibility="hidden"/><circle class="hd" r="4.5" fill="var(--ink)" stroke="var(--card)" stroke-width="2" visibility="hidden"/>`;
+      svg.innerHTML = s;
+      const tip = svg.nextElementSibling, hl = svg.querySelector('.hl'), hd = svg.querySelector('.hd');
+      svg.onpointermove = (e) => {
+        const rect = svg.getBoundingClientRect();
+        const px = ((e.clientX - rect.left) / rect.width) * W;
+        const i = Math.max(0, Math.min(n, Math.round(((px - l) / (W - l - r)) * n)));
+        hl.setAttribute('x1', X(i)); hl.setAttribute('x2', X(i)); hl.setAttribute('visibility', 'visible');
+        hd.setAttribute('cx', X(i)); hd.setAttribute('cy', Y(vals[i])); hd.setAttribute('visibility', 'visible');
+        tip.hidden = false;
+        tip.style.left = `${(X(i) / W) * rect.width}px`;
+        tip.style.top = `${(Y(vals[i]) / H) * rect.height}px`;
+        tip.textContent = `${pts[i][0]}　${fmt(vals[i], digits)}${unit}`;
+      };
+      svg.onpointerleave = () => { tip.hidden = true; hl.setAttribute('visibility', 'hidden'); hd.setAttribute('visibility', 'hidden'); };
+    }
+    addEventListener('resize', () => $('sheet').open && drawSheet());
+
+    // ---------- 更新 ----------
+    const btn = $('refresh');
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const r = await manualRefresh({ onStage: (s) => (btn.textContent = s), reloadData: load });
+        toast(r.message);
+      } catch (e) { toast(e.message); }
+      finally { btn.disabled = false; btn.textContent = '↻ 更新'; }
+    };
+    function toast(m) {
+      const t = $('toast'); t.textContent = m; t.hidden = false;
+      clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 6000);
+    }
+    setInterval(() => !document.hidden && load().catch(() => {}), 10 * 60000);
+
+    let rz = 0;
+    new ResizeObserver(() => {
+      cancelAnimationFrame(rz);
+      rz = requestAnimationFrame(() => { if (data) { drawStatic(); drawDyn(); } });
+    }).observe($('quad'));
+
+    load().catch((e) => ($('upd').textContent = `無法載入資料：${e.message}`));
+  </script>
+</body>
+</html>

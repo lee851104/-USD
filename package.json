@@ -1,0 +1,15 @@
+{
+  "name": "usd-yield-curve-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "美元指數 × 美債利差 四象限儀表板",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "fetch": "node scripts/fetch-data.mjs",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "serve": "node scripts/serve.mjs"
+  }
+}

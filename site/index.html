@@ -122,22 +122,38 @@
       .v { font-size: 26px; }
     }
 
-    /* 電腦版：左圖右說明，一頁呈現 */
-    @media (min-width: 960px) and (min-height: 560px) {
-      html, body { height: 100%; overflow: hidden; }
-      .wrap { max-width: 1280px; height: 100vh; padding: 16px 24px 12px;
-        grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr);
-        grid-template-rows: auto minmax(0, 1fr) auto;
+    /* 電腦版（寬 ≥ 760px）：左圖右說明 */
+    @media (min-width: 760px) {
+      .wrap { max-width: 1280px; padding: 16px 24px 12px;
+        grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr);
+        grid-template-rows: auto auto auto;
         grid-template-areas: "head head" "map info" "foot foot"; gap: 16px; }
       header { grid-area: head; }
       .map { grid-area: map; display: flex; flex-direction: column; min-height: 0; }
-      .map-box { flex: 1; aspect-ratio: auto; min-height: 0; }
-      .info { grid-area: info; overflow: auto; justify-content: center; padding: 24px 28px; gap: 14px; }
+      .info { grid-area: info; justify-content: center; padding: 24px 28px; gap: 14px; }
       footer { grid-area: foot; }
-      .info h2 { font-size: clamp(28px, 4vh, 40px); }
       .num { width: 44px; height: 44px; font-size: 24px; }
       .plain { font-size: 17px; }
-      .v { font-size: clamp(28px, 4.4vh, 40px); }
+    }
+    /* 視窗夠高時：剛好一頁、不捲動；不夠高就照常捲動 */
+    @media (min-width: 760px) and (min-height: 520px) {
+      html, body { height: 100%; overflow: hidden; }
+      .wrap { height: 100vh; grid-template-rows: auto minmax(0, 1fr) auto; }
+      .map-box { flex: 1; aspect-ratio: auto; min-height: 0; }
+      .info { overflow: auto; }
+      .info h2 { font-size: clamp(24px, 4vh, 40px); }
+      .v { font-size: clamp(24px, 4.4vh, 40px); }
+    }
+    /* 比較矮的視窗：說明區縮緊 */
+    @media (min-width: 760px) and (max-height: 720px) {
+      .wrap { padding-top: 10px; gap: 10px; }
+      .info { padding: 14px 18px; gap: 8px; }
+      .num { width: 36px; height: 36px; font-size: 20px; }
+      .plain { font-size: 15px; }
+      .tag { font-size: 13px; }
+      .nums { padding-top: 8px; }
+      .num-btn { padding: 7px 10px; }
+      .note { display: none; }
     }
   </style>
 </head>

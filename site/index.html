@@ -4,6 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>美元 × 利差</title>
+  <script>
+    // 在畫面繪製前套用使用者選過的主題，避免閃一下
+    try { const t = localStorage.getItem('usd-dash:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+  </script>
   <style>
     :root {
       color-scheme: light;
@@ -45,6 +49,10 @@
     .btn { font: inherit; font-size: 14px; border: 0; border-radius: 999px; padding: 7px 16px; min-height: 36px;
       background: var(--ink); color: var(--page); cursor: pointer; white-space: nowrap; }
     .btn[disabled] { opacity: .6; cursor: progress; }
+    .head-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+    .btn.icon { width: 36px; padding: 0; display: inline-grid; place-items: center; background: var(--card); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+    .btn.icon svg { width: 18px; height: 18px; }
+    .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
     /* 四象限圖 */
     .map { padding: 10px; position: relative; }
@@ -164,7 +172,10 @@
         <h1>美元 × 利差　現在在哪一格？</h1>
         <div class="upd" id="upd">載入中…</div>
       </div>
-      <button class="btn" id="refresh">↻ 更新</button>
+      <div class="head-actions">
+        <button class="btn icon" id="theme" type="button" aria-label="切換深色／淺色模式" title="切換深色／淺色模式"></button>
+        <button class="btn" id="refresh">↻ 更新</button>
+      </div>
     </header>
 
     <section class="card map">
@@ -479,6 +490,27 @@
     addEventListener('resize', () => $('sheet').open && drawSheet());
 
     // ---------- 更新 ----------
+    // ---------- 深色／淺色切換 ----------
+    const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+    const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+    const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+    const isDark = () => (document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : darkMQ.matches);
+    function paintThemeBtn() {
+      const dark = isDark();
+      // 顯示「按下去會切換成」的圖示
+      $('theme').innerHTML = dark ? SUN : MOON;
+      $('theme').setAttribute('aria-label', dark ? '切換成淺色模式' : '切換成深色模式');
+      $('theme').title = dark ? '切換成淺色模式' : '切換成深色模式';
+    }
+    $('theme').onclick = () => {
+      const next = isDark() ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('usd-dash:theme', next); } catch {}
+      paintThemeBtn();
+    };
+    darkMQ.addEventListener('change', paintThemeBtn);
+    paintThemeBtn();
+
     const btn = $('refresh');
     btn.onclick = async () => {
       btn.disabled = true;
